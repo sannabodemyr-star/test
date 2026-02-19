@@ -1,1 +1,210 @@
-kodkod
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arkimedes Princip - Laboration</title>
+    <!-- Vi använder Tailwind CSS för snabb och snygg styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Specialanpassad CSS för att ge bägaren ett mer realistiskt "glas"-utseende */
+        .glass-beaker {
+            box-shadow: inset 0 0 15px rgba(255, 255, 255, 0.4),
+                        inset 0 -5px 15px rgba(0, 0, 0, 0.05),
+                        0 10px 20px rgba(0, 0, 0, 0.05);
+            background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.4) 15%, rgba(255,255,255,0.0) 30%, rgba(255,255,255,0.0) 70%, rgba(255,255,255,0.2) 85%, rgba(255,255,255,0.1) 100%);
+        }
+        
+        /* Mjuk övergång när vattennivån ändras i framtida steg */
+        .water {
+            transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        /* Ljusare kant högst upp på vattnet för att simulera en yta */
+        .water-surface {
+            box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.6);
+        }
+        
+        /* Digital font för kraftmätaren och ny font för text */
+        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;700&display=swap');
+        .font-digital {
+            font-family: 'Share Tech Mono', monospace;
+        }
+        .font-alegreya {
+            font-family: 'Alegreya Sans', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+    
+    <!-- Huvudcontainer för laborationen -->
+    <div class="bg-white p-8 rounded-2xl shadow-xl max-w-3xl w-full">
+        <header class="mb-8 max-w-xl mx-auto">
+            <h1 class="font-alegreya font-bold text-[28px] text-black mb-2 text-left">Okänd densitet</h1>
+            <p class="font-alegreya text-[18px] text-black leading-relaxed text-left">Figuren nedan visar en cylinder som hänger i en kraftmätare. Din uppgift är att bestämma densiteten för oljan. Här nedanför kan du ställa in vätska i bägaren och sänka ned cylindern i vätskan med hjälp av reglaget.</p>
+        </header>
+
+        <!-- Simuleringsområdet (Scenen) -->
+        <div class="relative w-full h-[500px] flex items-end justify-center pb-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50 overflow-hidden">
+            
+            <!-- Interaktiv utrustning (Kraftmätare, tråd, cylinder) -->
+            <!-- z-10 lägger den bakom bägarens front, så det ser ut som den sänks ner I vätskan -->
+            <div id="assembly" class="absolute top-0 left-1/2 -translate-x-1/2 flex flex-col items-center z-10 transition-transform duration-75" style="transform: translate(-50%, 0px);">
+                <!-- Kraftmätare -->
+                <div class="bg-slate-800 text-green-400 font-digital text-2xl p-2 rounded-md border-4 border-slate-700 shadow-lg w-28 text-center relative">
+                    <div class="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-4 border-2 border-slate-600 rounded-full"></div> <!-- Ögla uppe -->
+                    <span id="force-display">2.00</span> N
+                </div>
+                <!-- Tråd -->
+                <!-- Tråden är förlängd från h-16 till h-24 (32px längre) -->
+                <div class="w-0.5 h-24 bg-slate-400"></div>
+                <!-- Cylinder -->
+                <!-- Cylindern är 96px hög (h-24), z-10 tillagt för att dölja slapp tråd -->
+                <div id="cylinder" class="w-16 h-24 bg-gradient-to-br from-slate-400 to-slate-600 rounded-sm shadow-md border border-slate-500 relative z-10">
+                    <div class="absolute -top-2 left-1/2 -translate-x-1/2 w-2 h-2 border-2 border-slate-400 rounded-full"></div> <!-- Ögla nere -->
+                </div>
+            </div>
+
+            <!-- Bägaren -->
+            <!-- border-t-0 gör att den är öppen i toppen. rounded-b-2xl rundar botten. z-20 framför cylindern. pointer-events-none så man inte klickar på den av misstag -->
+            <div class="relative w-56 h-72 border-4 border-t-0 border-slate-300 rounded-b-2xl glass-beaker overflow-hidden z-20 flex items-end pointer-events-none">
+                
+                <!-- Vattnet -->
+                <!-- Vi sätter en fast starthöjd i pixlar för att enklare räkna på volymen -->
+                <div id="water" class="water w-full h-[144px] bg-cyan-400/50 relative">
+                    <!-- Vattenytan (visuell effekt) -->
+                    <div id="water-surface" class="water-surface absolute top-0 w-full h-3 bg-cyan-300/70 border-b border-cyan-400/50"></div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Yta för kontroller (Vätskeval, reglage etc) -->
+        <div class="mt-8 flex flex-col items-center justify-center w-full max-w-md mx-auto space-y-6">
+            
+            <!-- Nytt: Vätskeval -->
+            <div class="w-full flex flex-col items-center">
+                <label for="liquid-select" class="block text-sm font-medium text-slate-700 mb-2">Välj vätska i bägaren</label>
+                <select id="liquid-select" class="w-full p-2 border border-slate-300 rounded-md bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-slate-700">
+                    <option value="water">Vatten (Densitet: 0,998 g/cm³)</option>
+                    <option value="oil">Olja</option>
+                </select>
+            </div>
+
+            <div class="w-full flex flex-col items-center">
+                <label for="height-slider" class="block text-sm font-medium text-slate-700 mb-2">Höj och sänk cylindern</label>
+                <!-- Sliderns maxvärde är ökat till 220 så den når botten -->
+                <input type="range" id="height-slider" min="0" max="220" value="0" class="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600">
+                <div class="flex justify-between w-full text-xs text-slate-400 mt-2">
+                    <span>Uppe i luften</span>
+                    <span>På bägarens botten</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- JAVASCRIPT ---
+        
+        // Hämta DOM-element
+        const waterElement = document.getElementById('water');
+        const waterSurface = document.getElementById('water-surface');
+        const assemblyElement = document.getElementById('assembly');
+        const forceDisplay = document.getElementById('force-display');
+        const heightSlider = document.getElementById('height-slider');
+        const cylinderElement = document.getElementById('cylinder');
+        const liquidSelect = document.getElementById('liquid-select');
+        
+        // Fysikaliska/Geometriska konstanter för simuleringen
+        const weightInAir = 2.00; // Newton
+        const baseBuoyantForce = 0.80; // Newton (Lyftkraft när cylindern är nedsänkt i vatten: densitet 1.0)
+        
+        const cylinderHeight = 96; // px
+        const maxWaterRise = 24; // px (Hur mycket vätskan stiger i bägaren)
+        const distanceToWater = 60; // px
+        const baseWaterHeight = 144; // px
+        const distanceToBottom = 204; // px
+
+        // Vätskornas egenskaper
+        const liquids = {
+            water: {
+                densityFactor: 0.998,
+                baseColor: 'bg-cyan-400/50',
+                surfaceColor: 'bg-cyan-300/70',
+                borderColor: 'border-cyan-400/50'
+            },
+            oil: {
+                densityFactor: 0.8,
+                baseColor: 'bg-yellow-400/50',
+                surfaceColor: 'bg-yellow-300/70',
+                borderColor: 'border-yellow-400/50'
+            }
+        };
+
+        // Håller koll på vald vätska
+        let currentLiquidId = 'water';
+
+        // Vi lägger logiken i en egen funktion så vi kan köra den både när vi drar i slidern OCH byter vätska
+        function updateSimulation() {
+            const yOffset = parseFloat(heightSlider.value);
+            
+            // 1. Flytta hela utrustningen
+            assemblyElement.style.transform = `translate(-50%, ${yOffset}px)`;
+            
+            // 2. Beräkna nedsänkning
+            const deltaY = yOffset - distanceToWater;
+            let submergedRatio = 0;
+            
+            if (deltaY > 0) {
+                const submergedPx = deltaY / (1 - (maxWaterRise / cylinderHeight));
+                submergedRatio = Math.min(1, Math.max(0, submergedPx / cylinderHeight));
+            }
+
+            // 3. Uppdatera vätskenivån visuellt
+            const currentWaterHeight = baseWaterHeight + (submergedRatio * maxWaterRise);
+            waterElement.style.height = `${currentWaterHeight}px`;
+
+            // 4. Beräkna kraften baserat på den valda vätskans densitet
+            const currentLiquid = liquids[currentLiquidId];
+            const maxBuoyantForce = baseBuoyantForce * currentLiquid.densityFactor;
+            let currentForce = weightInAir - (submergedRatio * maxBuoyantForce);
+
+            // 5. Hantera botten
+            let cylinderOffset = 0;
+            if (yOffset >= distanceToBottom) {
+                cylinderOffset = distanceToBottom - yOffset;
+                currentForce = 0; // Tråden blir slapp
+            }
+            
+            cylinderElement.style.transform = `translateY(${cylinderOffset}px)`;
+            forceDisplay.innerText = currentForce.toFixed(2);
+        }
+
+        // Lyssna på reglaget (när vi sänker/höjer)
+        heightSlider.addEventListener('input', updateSimulation);
+
+        // Lyssna på rullgardinsmenyn (när vi byter vätska)
+        liquidSelect.addEventListener('change', (e) => {
+            const newLiquidId = e.target.value;
+            const oldLiquid = liquids[currentLiquidId];
+            const newLiquid = liquids[newLiquidId];
+
+            // Byt CSS-klasser för att ändra färg på vätskan
+            waterElement.classList.replace(oldLiquid.baseColor, newLiquid.baseColor);
+            waterSurface.classList.replace(oldLiquid.surfaceColor, newLiquid.surfaceColor);
+            waterSurface.classList.replace(oldLiquid.borderColor, newLiquid.borderColor);
+
+            currentLiquidId = newLiquidId;
+            
+            // Beräkna om fysiken direkt, utifall cylindern redan befinner sig i vätskan
+            updateSimulation();
+        });
+
+        // Kör en gång vid start för att allt ska vara i synk
+        updateSimulation();
+
+    </script>
+</body>
+</html>
